@@ -3,7 +3,7 @@
 
 #include <iostream>
 #include <string>
-#include "PublicUtils.h"
+#include "Public.h"
 
 using namespace std;
 
@@ -24,8 +24,6 @@ typedef struct {
 
 class NAT {
 public:
-
-
 
 	static void init();
 

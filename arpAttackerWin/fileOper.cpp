@@ -19,7 +19,7 @@
 #include "fileOper.h"
 #include <stdio.h>
 
-
+using namespace std;
 
 int FileOper::fileReader(string filename, char ** lpbuf, int *bufsize) {
 	int ret = 0;
@@ -27,12 +27,12 @@ int FileOper::fileReader(string filename, char ** lpbuf, int *bufsize) {
 	FILE * fp = fopen(filename.c_str(), "rb");
 	if (fp <= 0)
 	{
-		return -1;
+		return 0;
 	}
 
 	ret = fseek(fp, 0, SEEK_END);
 
-	int filesize = ftell(fp);
+	unsigned long filesize = ftell(fp);
 
 	ret = fseek(fp, 0, SEEK_SET);
 
@@ -45,7 +45,7 @@ int FileOper::fileReader(string filename, char ** lpbuf, int *bufsize) {
 	if (ret == 0)
 	{
 		delete[] lpbuf;
-		return -1;
+		return 0;
 	}
 
 	*(*lpbuf + filesize) = 0;

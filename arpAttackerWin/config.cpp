@@ -1,17 +1,19 @@
 
 
-#include "windows.h"
+#define WIN32_LEAN_AND_MEAN  // 减少不必要的头文件
+#include <winsock2.h>
+#include <windows.h>
 #include "config.h"
 #include "fileOper.h"
+#include "Utils.h"
 #include "Public.h"
-#include "PublicUtils.h"
 #include "ClientAddress.h"
 
 #include <vector>
 #include <iostream>
 #include <string>
-#include "Public.h"
 
+#include "Public.h"
 
 using namespace std;
 
@@ -19,7 +21,7 @@ int Config::addTarget(unsigned int ip,vector<CLIENTADDRESSES>&attackList) {
 	int ret = 0;
 
 	unsigned char mac[MAC_ADDRESS_SIZE];
-	ret = ClientAddress::getMACFromIP(ip, mac);
+	ret = ClientAddress::GetMACFromIP(ip, mac);
 	if (ret == 0)
 	{
 		ret = addTarget(attackList, ip, mac);
@@ -29,7 +31,7 @@ int Config::addTarget(unsigned int ip,vector<CLIENTADDRESSES>&attackList) {
 }
 
 
-int Config::addTarget(vector<CLIENTADDRESSES> & targets,unsigned int ip,unsigned char mac[MAC_ADDRESS_SIZE]) {
+int Config::addTarget(vector<CLIENTADDRESSES> & targets,unsigned int ip,unsigned char* mac) {
 
 	if (ip == gLocalIP || ip == gGatewayIP || ((ntohl(ip) & 0xff) == 0) || ((ntohl(ip) & 0xff) == 0xff) )
 	{
@@ -44,32 +46,31 @@ int Config::addTarget(vector<CLIENTADDRESSES> & targets,unsigned int ip,unsigned
 		}
 	}
 
-
 	CLIENTADDRESSES ca = { 0 };
 	ca.clientIP = ip;
 	memmove(ca.clientMAC, mac, MAC_ADDRESS_SIZE);
 	targets.push_back(ca);
 
-	string strip = Public::formatIP(ca.clientIP);
-	string strmac = Public::formatMAC(ca.clientMAC);
-	printf("add attack ip:%s,mac:%s\r\n", strip.c_str(), strmac.c_str());
+	string strip = Utils::formatIP(ca.clientIP);
+	string strmac = Utils::formatMAC(ca.clientMAC);
+	printf("add target ip:%s,mac:%s\r\n", strip.c_str(), strmac.c_str());
 
 	return 0;
 
 }
 
 
-int Config::getAttackTarget(string fn,vector<CLIENTADDRESSES> & targets,int * speed,int * arprepeat) {
+int Config::getAttackTarget(string fn,vector<CLIENTADDRESSES> & targets,int * speed,int * arprepeat,int *mode) {
 	int ret = 0;
 	char * buf = 0;
 	int fs = 0;
 
 	ret = FileOper::fileReader(fn, &buf, &fs);
-	if (ret < 0) {
+	if (ret <= 0) {
 		return -1;
 	}
 
-	int cfglen = Public::removespace(buf, buf);
+	int cfglen = Utils::removespace(buf, buf);
 	string str = string(buf, cfglen);
 	delete buf;
 
@@ -78,7 +79,7 @@ int Config::getAttackTarget(string fn,vector<CLIENTADDRESSES> & targets,int * sp
 	while (1) {
 		int linepos = str.find("\r\n");
 		if (linepos >= 0) {
-			substr = str.substr(0, linepos);
+			substr = str.substr(0, linepos+2);
 		}
 		else {
 			substr = str;
@@ -90,6 +91,7 @@ int Config::getAttackTarget(string fn,vector<CLIENTADDRESSES> & targets,int * sp
 
 		char * arpdelayhdr = "arprepeat=";
 		char * speedhdr = "speed=";
+		char* modehdr = "mode=";
 
 		hdr = strstr(substr.c_str(), "[");
 		if (hdr > 0) {
@@ -100,7 +102,7 @@ int Config::getAttackTarget(string fn,vector<CLIENTADDRESSES> & targets,int * sp
 				string value = string(hdr, end - hdr);
 				if (lstrcmpiA(value.c_str(),"alls") == 0)
 				{
-					targets = gOnlineObjects;
+					targets = gTotalObjects;
 					printf("crazy mode start!\r\n");
 					return targets.size();
 				}else if (memcmp(value.c_str(), speedhdr,strlen(speedhdr)) == 0)
@@ -115,11 +117,34 @@ int Config::getAttackTarget(string fn,vector<CLIENTADDRESSES> & targets,int * sp
 					*arprepeat = atoi(strarpdelay.c_str())*1000;
 					printf("set arp repeat speed:%d millionseconds\r\n", *arprepeat);
 				}
+				else if (memcmp(value.c_str(), modehdr, strlen(modehdr)) == 0)
+				{
+					string strmode = value.substr(strlen(modehdr));
+					if (strmode.length() > 0 && strmode == "proxy") {
+						*mode = PROXY_MODE;
+					}
+					else if (strmode == "attack") {
+						*mode = ATTACK_MODE;
+					}
+					else {
+						*mode = 0;
+					}
+					printf("mode:%s\r\n", strmode.c_str());
+				}
 				else {
 					unsigned int ip = inet_addr(value.c_str());
-					if (ip != 0 && ip!= 0xffffffff)
+					if (*mode == 1) {
+						CLIENTADDRESSES ca = { 0 };
+						ca.clientIP = ip;
+						memmove(ca.clientMAC, ZERO_MAC_ADDRESS, MAC_ADDRESS_SIZE);
+						targets.push_back(ca);
+					}
+					else if (*mode == 2 && ip != 0 && ip!= 0xffffffff)
 					{
 						ret = addTarget(ip, targets);
+					}
+					else {
+
 					}
 				}
 			}
@@ -149,7 +174,7 @@ int Config::getAttackTargetFromCmd(char * buf, vector<CLIENTADDRESSES> & targets
 	char * arpdelayhdr = "arprepeat=";
 	char * speedhdr = "speed=";
 
-	int cfglen = Public::removespace(buf, buf);
+	int cfglen = Utils::removespace(buf, buf);
 	string str = string(buf, cfglen);
 
 	string substr = "";
@@ -157,7 +182,7 @@ int Config::getAttackTargetFromCmd(char * buf, vector<CLIENTADDRESSES> & targets
 	while (1) {
 		int linepos = str.find(",");
 		if (linepos >= 0) {
-			substr = str.substr(0, linepos);
+			substr = str.substr(0, linepos+1);
 		}
 		else {
 			substr = str;
@@ -167,7 +192,7 @@ int Config::getAttackTargetFromCmd(char * buf, vector<CLIENTADDRESSES> & targets
 		string value = substr;
 		if (lstrcmpiA(value.c_str(), "alls") == 0)
 		{
-			targets = gOnlineObjects;
+			targets = gTotalObjects;
 			printf("crazy mode start!\r\n");
 			return targets.size();
 		}

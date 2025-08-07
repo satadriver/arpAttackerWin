@@ -1,1 +1,51 @@
-﻿  arpAttackerWin.vcxproj -> D:\project\arpAttackerWin\Debug\arpHijack.exe
+﻿C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Microsoft\VC\v170\Microsoft.CppBuild.targets(538,5): warning MSB8028: 中间目录(Debug\)包含从另一个项目(arpHijack.vcxproj)共享的文件。   这会导致错误的清除和重新生成行为。
+  ArpCheat.cpp
+D:\Project\arpAttackerWin-main\arpAttackerWin\ArpCheat.cpp(2,9): warning C4005: “WIN32_LEAN_AND_MEAN”: 宏重定义
+      D:\Project\arpAttackerWin-main\arpAttackerWin\ArpCheat.cpp(2,9):
+      之前在命令行上声明的“WIN32_LEAN_AND_MEAN”
+  
+  ClientAddress.cpp
+D:\Project\arpAttackerWin-main\arpAttackerWin\ClientAddress.cpp(4,9): warning C4005: “WIN32_LEAN_AND_MEAN”: 宏重定义
+      D:\Project\arpAttackerWin-main\arpAttackerWin\ClientAddress.cpp(4,9):
+      之前在命令行上声明的“WIN32_LEAN_AND_MEAN”
+  
+  ConnectionManager.cpp
+D:\Project\arpAttackerWin-main\arpAttackerWin\ConnectionManager.cpp(3,9): warning C4005: “WIN32_LEAN_AND_MEAN”: 宏重定义
+      D:\Project\arpAttackerWin-main\arpAttackerWin\ConnectionManager.cpp(3,9):
+      之前在命令行上声明的“WIN32_LEAN_AND_MEAN”
+  
+  main.cpp
+D:\Project\arpAttackerWin-main\arpAttackerWin\main.cpp(9,9): warning C4005: “WIN32_LEAN_AND_MEAN”: 宏重定义
+      D:\Project\arpAttackerWin-main\arpAttackerWin\main.cpp(9,9):
+      之前在命令行上声明的“WIN32_LEAN_AND_MEAN”
+  
+  PacketProcess.cpp
+D:\Project\arpAttackerWin-main\arpAttackerWin\PacketProcess.cpp(3,9): warning C4005: “WIN32_LEAN_AND_MEAN”: 宏重定义
+      D:\Project\arpAttackerWin-main\arpAttackerWin\PacketProcess.cpp(3,9):
+      之前在命令行上声明的“WIN32_LEAN_AND_MEAN”
+  
+D:\Project\arpAttackerWin-main\arpAttackerWin\PacketProcess.cpp(150,25): error C2660: “ArpCheat::FakeGateway”: 函数不接受 1 个参数
+      D:\Project\arpAttackerWin-main\arpAttackerWin\ArpCheat.h(14,13):
+      参见“ArpCheat::FakeGateway”的声明
+      D:\Project\arpAttackerWin-main\arpAttackerWin\PacketProcess.cpp(150,25):
+      尝试匹配参数列表“(pcap_t *)”时
+  
+  SnifferTargets.cpp
+D:\Project\arpAttackerWin-main\arpAttackerWin\SnifferTargets.cpp(2,9): warning C4005: “WIN32_LEAN_AND_MEAN”: 宏重定义
+      D:\Project\arpAttackerWin-main\arpAttackerWin\SnifferTargets.cpp(2,9):
+      之前在命令行上声明的“WIN32_LEAN_AND_MEAN”
+  
+  virtualIP.cpp
+D:\Project\arpAttackerWin-main\arpAttackerWin\Public.h(10,9): warning C4005: “WIN32_LEAN_AND_MEAN”: 宏重定义
+  (编译源文件“virtualIP.cpp”)
+      D:\Project\arpAttackerWin-main\arpAttackerWin\Public.h(10,9):
+      之前在命令行上声明的“WIN32_LEAN_AND_MEAN”
+  
+  winpcap.cpp
+D:\Project\arpAttackerWin-main\arpAttackerWin\Public.h(10,9): warning C4005: “WIN32_LEAN_AND_MEAN”: 宏重定义
+  (编译源文件“winpcap.cpp”)
+      D:\Project\arpAttackerWin-main\arpAttackerWin\Public.h(10,9):
+      之前在命令行上声明的“WIN32_LEAN_AND_MEAN”
+  
+  正在生成代码...
+D:\Project\arpAttackerWin-main\arpAttackerWin\ArpCheat.cpp(126,1): error C4716: “ArpCheat::FakeGateway”: 必须返回一个值

@@ -2,21 +2,23 @@
 
 #ifndef ARPCHEAT_H
 #define ARPCHEAT_H
-#include "..\\include\\pcap.h"
-#include "..\\include\\pcap\\pcap.h"
-#include "PublicUtils.h"
+
+#include <pcap.h>
+#include <pcap/pcap.h>
+#include "Public.h"
 
 class ArpCheat {
 public:
 	static int __stdcall ArpCheatProc(pcap_t * param);
-	static int sendRarps(pcap_t *pt);
 
-	static int ArpCheat::makeFakeClient(pcap_t * pcapt, unsigned int ip, unsigned char mac[MAC_ADDRESS_SIZE]);
+	static int FakeGateway(pcap_t* pcapt, unsigned int ip, unsigned char* mac);
 
-	static int ArpCheat::broadcastArp(pcap_t * pcapt, unsigned int ip);
+	static int ArpCheat::VirtualProxy(pcap_t * pcapt, unsigned int ip, unsigned char* mac);
 
-	static int arpReply(pcap_t * pcapt, unsigned int srcip, unsigned char srcmac[MAC_ADDRESS_SIZE], unsigned int dstip, unsigned char * dstmac);
+	static int ArpCheat::BroadcastARP(pcap_t * pcapt, unsigned int ip);
 
+	static int EchoRARP(pcap_t* pcapt, unsigned int senederip, unsigned char* sendermac,
+		unsigned int recverip, unsigned char* recvermac);
 
 	//static int ArpCheat::adjustSelf(pcap_t * pcapt);
 

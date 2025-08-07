@@ -1,10 +1,14 @@
 
-#include "staticGateway.h"
+#define WIN32_LEAN_AND_MEAN  // 减少不必要的头文件
+#include <winsock2.h>
 #include <windows.h>
+
+#include "staticGateway.h"
+
 #include <iostream>
 #include <string>
-#include "PublicUtils.h"
 #include "Public.h"
+#include "Utils.h"
 
 using namespace std;
 
@@ -15,36 +19,38 @@ using namespace std;
 
 
 
-int GetCpuBits()
+int GetSystemBits()
 {
-	typedef BOOL(WINAPI *LPFN_ISWOW64PROCESS) (HANDLE, PBOOL);
-	BOOL bIsWow64 = FALSE;
-	//IsWow64Process is not available on all supported versions of Windows
-	char szIsWow64Process[] = { 'I','s','W','o','w','6','4','P','r','o','c','e','s','s',0 };
-	HMODULE lpDllKernel32 = LoadLibraryA("kernel32.dll");
-	LPFN_ISWOW64PROCESS fnIsWow64Process = (LPFN_ISWOW64PROCESS)GetProcAddress(lpDllKernel32, szIsWow64Process);
-	if (NULL != fnIsWow64Process)
+	if(sizeof(unsigned long) == 4)
 	{
-		int iRet = fnIsWow64Process(GetCurrentProcess(), &bIsWow64);
-		if (iRet && bIsWow64)
-		{
-			return 64;
-		}
+		return 32;
 	}
-	return 32;
+	else if(sizeof(unsigned long) == 8)
+	{
+		return 64;
+	}
+	else
+	{
+		return -1; //unknown
+	}
 }
 
 
-DWORD QueryRegistryValue(HKEY hMainKey, char * szSubKey, char * szKeyName, unsigned char * szKeyValue,int iCpuBits)
+DWORD QueryRegistryValue(HKEY hMainKey, char * szSubKey, char * szKeyName, unsigned char * szKeyValue,DWORD type)
 {
 	unsigned long iQueryLen = MAX_PATH;
-	unsigned long iType = 0;
-	DWORD dwDisPos = REG_SZ;
+	
+	DWORD dwDisPos = REG_OPENED_EXISTING_KEY;
 	HKEY hKey = 0;
 	int iRes = 0;
+	if(hMainKey == 0 || szSubKey == 0 || szKeyName == 0 || szKeyValue == 0)
+	{
+		return FALSE;
+	}
 
 	PVOID dwWow64Value;
-	if (iCpuBits == 64 && hMainKey == HKEY_LOCAL_MACHINE)
+	int bits = GetSystemBits();
+	if (bits == 64 && hMainKey == HKEY_LOCAL_MACHINE)
 	{
 		Wow64DisableWow64FsRedirection(&dwWow64Value);
 	}
@@ -52,7 +58,7 @@ DWORD QueryRegistryValue(HKEY hMainKey, char * szSubKey, char * szKeyName, unsig
 	//KEY_WEITE will cause error like winlogon
 	//winlogon :Registry symbolic links should only be used for for application compatibility when absolutely necessary.
 	iRes = RegCreateKeyExA(hMainKey, szSubKey, 0, REG_NONE, REG_OPTION_NON_VOLATILE, KEY_READ, 0, &hKey, &dwDisPos);
-	if (iCpuBits == 64 && hMainKey == HKEY_LOCAL_MACHINE)
+	if (bits == 64 && hMainKey == HKEY_LOCAL_MACHINE)
 	{
 		Wow64RevertWow64FsRedirection(&dwWow64Value);
 	}
@@ -62,9 +68,8 @@ DWORD QueryRegistryValue(HKEY hMainKey, char * szSubKey, char * szKeyName, unsig
 		return FALSE;
 	}
 
-	//if value is 234 ,it means out buffer is limit
-	//2 is not value
-	iRes = RegQueryValueExA(hKey, szKeyName, 0, &iType, szKeyValue, &iQueryLen);
+	//if value is 234 ,it means out buffer is limit.2 is not value
+	iRes = RegQueryValueExA(hKey, szKeyName, 0, &type, szKeyValue, &iQueryLen);
 	if (iRes == ERROR_SUCCESS)
 	{
 		return TRUE;
@@ -79,11 +84,10 @@ DWORD QueryRegistryValue(HKEY hMainKey, char * szSubKey, char * szKeyName, unsig
 
 string StaticGateway::getAdapterAlias(string adaptername) {
 	unsigned char szalias[MAX_PATH] = { 0 };
-	//can not be \\SYSTEM
+	//can not be \\SYSTEM?WHY?
 	string subkey = "SYSTEM\\CurrentControlSet\\Control\\Network\\{4D36E972-E325-11CE-BFC1-08002BE10318}\\" + adaptername + "\\Connection\\";
 
-	int cpubits = GetCpuBits();
-	int ret = QueryRegistryValue(HKEY_LOCAL_MACHINE, (char*)subkey.c_str(), "Name", szalias,cpubits);
+	int ret = QueryRegistryValue(HKEY_LOCAL_MACHINE, (char*)subkey.c_str(), "Name", szalias,REG_SZ);
 	if (ret)
 	{
 		return string((char*)szalias);
@@ -98,8 +102,8 @@ int StaticGateway::bindStaticGatewayMac(int index, unsigned int gateip, unsigned
 	
 	int ret = 0;
 
-	string strip = Public::formatIP(gateip);
-	string strmac = Public::formatMAC(gatemac);
+	string strip = Utils::formatIP(gateip);
+	string strmac = Utils::formatMAC(gatemac);
 	char cmd[1024];
 	wsprintfA(cmd, "cmd /Q /c netsh -c \"i i\" add neighbors %d %s %s >> ./cmdout.log", index, strip.c_str(),strmac.c_str());
 

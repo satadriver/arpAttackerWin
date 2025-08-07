@@ -1,8 +1,9 @@
 
 
 #include "winpcap.h"
-#include "PublicUtils.h"
+#include "Public.h"
 
+using namespace std;
 
 pcap_t * Winpcap::init(string devn,int speed) {
 	char		strPcapErrBuf[PCAP_ERRBUF_SIZE];

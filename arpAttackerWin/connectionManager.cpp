@@ -1,10 +1,15 @@
 
 
-
-//#include <winsock2.h>
+#define WIN32_LEAN_AND_MEAN  // 减少不必要的头文件
+#include <winsock2.h>
 #include <windows.h>
+
 #include "connectionManager.h"
-#include "PublicUtils.h"
+#include "Public.h"
+
+
+using namespace std;
+using namespace std::tr1;
 
 unordered_map <string, CLIENTADDRESSES> mapHijack;
 
@@ -19,11 +24,11 @@ int ConnectionManager::put(unsigned int clientip,unsigned short clientport,unsig
 	char szkey[256];
 	string mapKeyFormat = "%x_%x_%x_%x_%x";
 	wsprintfA(szkey, mapKeyFormat.c_str(), clientip, clientport, serverip, serverport,protocol);
-	//unordered_map <string, CLIENTADDRESSES>::iterator mapHijackIt = mapHijack.find(szkey);
-	//if (mapHijackIt == mapHijack.end()) {
+	unordered_map <string, CLIENTADDRESSES>::iterator mapHijackIt = mapHijack.find(szkey);
+	if (mapHijackIt == mapHijack.end()) {
 		mapHijack.insert(unordered_map<string, CLIENTADDRESSES>::value_type(string(szkey), ca));
 		return 0;
-	//}
+	}
 
 	return -1;
 }
@@ -43,7 +48,6 @@ CLIENTADDRESSES ConnectionManager::get( unsigned short clientport, unsigned int 
 			return mapHijackIt->second;
 		}
 	}
-
 
 	CLIENTADDRESSES ca = { 0 };
 	return ca;
@@ -82,7 +86,7 @@ int __stdcall ConnectionManager::clearmap() {
 		}
 	}
 	catch (const std::exception& e) {
-		printf("clearmap exception:%s\r\n", e.what());
+		printf("%s exception:%s\r\n",__FUNCTION__, e.what());
 	}
 	return 0;
 }

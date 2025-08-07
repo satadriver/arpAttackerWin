@@ -2,7 +2,7 @@
 #include "nat.h"
 #include <time.h>
 #include <windows.h>
-#include "PublicUtils.h"
+#include "Public.h"
 #include <stdio.h>
 
 static LPNATDATA gNatUdpBase;
@@ -100,7 +100,7 @@ void NAT::transfer(unsigned char *mac,unsigned long &ip,unsigned short &port, in
 
 			unsigned short tmpport = (lpptr - lpbase) + NATMIN;
 			port = ntohs(tmpport);
-			//ip = gFakeProxyIP;
+			//ip = gVirtualProxyIP;
 			
 			if (lpptr >= lpbase + NATSIZE)
 			{
@@ -189,7 +189,7 @@ void NAT::reset(unsigned short port, int protocol) {
 //#define RAND_MAX 0xffffffff
 void test() {
 	NAT::init();
-	srand(time(0));
+	srand((unsigned long)time(0));
 	int tmpip = 0x72727272;
 	unsigned short tmpport = 65535;
 	int protocol = 6;

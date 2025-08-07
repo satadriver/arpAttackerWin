@@ -9,13 +9,12 @@
 #include <map>
 
 #include <unordered_map>  
-#include "PublicUtils.h"
+#include "Public.h"
 #include "ClientAddress.h"
 #include "ArpCheat.h"
 
 
-using namespace std;
-using namespace std::tr1;
+
 
 
 

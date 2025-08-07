@@ -6,36 +6,33 @@
 #include <iostream>
 #include <string>
 #include <vector>
-#include "Public.h"
+#include "Utils.h"
 #include <algorithm>
 
 
 
 using namespace std;
 
-unsigned int VirtualIP::makeVirtualIP(void * param, vector <CLIENTADDRESSES> &targets) {
+unsigned int VirtualIP::GetVirtualIP(void * param, vector <CLIENTADDRESSES> &targets) {
 
-	int ret = SnifferTargets::snifferHostsMain(param, targets);
+	unsigned int virtualIP = 0;
+	int ret = SnifferTargets::GetTarget(param, targets);
 	if (targets.size() <=0 )
 	{
-		printf("not found targets on the line,please rescan\r\n");
+		printf("Not found target,please rescan\r\n");
 		return 0;
 	}
-
 
 	//sort(gOnlineObjects.begin(), gOnlineObjects.end());
 	//gOnlineObjects.erase(unique(gOnlineObjects.begin(), gOnlineObjects.end()), gOnlineObjects.end());
 
 	int cnt = ConnectionManager::getSubnetSize();
-
 	for (int i = 0; i < cnt; i++) {
 		unsigned int ip = ntohl(ntohl(gNetMaskIP) + i);
 
 		if (i == 0xff || ip == gLocalIP || ip == gNetMaskIP || ip == gGatewayIP) {
 			continue;
-		}
-
-		
+		}	
 		unsigned int j = 0;
 		for (j = 0;j < targets.size(); j ++)
 		{
@@ -47,21 +44,21 @@ unsigned int VirtualIP::makeVirtualIP(void * param, vector <CLIENTADDRESSES> &ta
 
 		if (j >= targets.size())
 		{
-			gFakeProxyIP = ip;
+			virtualIP = ip;
 			break;
 		}
 	}
 
-	if (gFakeProxyIP)
+	if (virtualIP)
 	{
-		string strip = Public::formatIP(gFakeProxyIP);
-		printf("get fake client ip:%s\r\n", strip.c_str());
+		string strip = Utils::formatIP(virtualIP);
+		printf("get proxy client ip:%s\r\n", strip.c_str());
 	}
 	else {
-		printf("find fake client ip error\r\n");
+		printf("find proxy client ip error\r\n");
 		
 	}
 
-	return gFakeProxyIP;
+	return virtualIP;
 	
 }

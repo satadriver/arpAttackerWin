@@ -1,23 +1,12 @@
-﻿  ArpCheat.cpp
-  ClientAddress.cpp
-  config.cpp
-  connectionManager.cpp
-  fileOper.cpp
+﻿C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Microsoft\VC\v170\Microsoft.CppBuild.targets(538,5): warning MSB8028: 中间目录(Release\)包含从另一个项目(arpHijack.vcxproj)共享的文件。   这会导致错误的清除和重新生成行为。
   main.cpp
-  nat.cpp
-nat.cpp(192): warning C4244: “参数”: 从“time_t”转换到“unsigned int”，可能丢失数据
-  NetcardInfo.cpp
-  Public.cpp
-  PublicUtils.cpp
-  PacketProcess.cpp
-  refreshTargets.cpp
-  snifferTargets.cpp
-  staticGateway.cpp
-  virtualIP.cpp
-  vNatModel.cpp
-  winpcap.cpp
+D:\Project\arpAttackerWin-main\arpAttackerWin\main.cpp(9,9): warning C4005: “WIN32_LEAN_AND_MEAN”: 宏重定义
+      D:\Project\arpAttackerWin-main\arpAttackerWin\main.cpp(9,9):
+      之前在命令行上声明的“WIN32_LEAN_AND_MEAN”
+  
   正在生成代码
-  All 544 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
+  1 of 409 functions ( 0.2%) were compiled, the rest were copied from previous compilation.
+    0 functions were new in current compilation
+    0 functions had inline decision re-evaluated but remain unchanged
   已完成代码的生成
-  arpAttackerWin.vcxproj -> D:\vsproject\arpAttackerWin\Release\arpHijack.exe
-  arpAttackerWin.vcxproj -> D:\vsproject\arpAttackerWin\Release\arpHijack.pdb (Full PDB)
+  arpAttackerWin.vcxproj -> D:\Project\arpAttackerWin-main\Release\ArpAttack.exe
