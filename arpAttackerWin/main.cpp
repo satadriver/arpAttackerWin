@@ -149,7 +149,7 @@ int __cdecl main(int argc, TCHAR* argv[])
 		do 
 		{
 			printf("Please input ip address to attack:");
-			char sztargets[4096] = { 0 };
+			char sztargets[1024] = { 0 };
 			nRetCode = scanf("%s", sztargets);
 			printf("\r\n");
 

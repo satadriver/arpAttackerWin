@@ -18,20 +18,37 @@ using namespace std;
 //netsh -c "i i" delete neighbors 21
 
 
+BOOL IsRunningInWOW64() {
+#ifdef _WIN64
+	return FALSE; // 64-bit process, not WOW64
+#else
+	BOOL bIsWow64 = FALSE;
+	// 尝试调用 IsWow64Process（适用于 Windows XP SP2+）
+	// 静态链接需要 Vista+，动态加载更安全。
+	// 实际上，在 Windows 2000 上，GetProcAddress 是需要的，但代码中直接使用其效果更好。
+	typedef BOOL(WINAPI* LPFN_ISWOW64PROCESS)(HANDLE, PBOOL);
+	LPFN_ISWOW64PROCESS fnIsWow64Process = (LPFN_ISWOW64PROCESS)GetProcAddress(GetModuleHandleW(L"kernel32"), 
+		"IsWow64Process");
+	if (fnIsWow64Process != NULL) {
+		if (fnIsWow64Process(GetCurrentProcess(), &bIsWow64)) {
+			return bIsWow64;
+		}
+	}
+	return FALSE; // 不在此环境中运行，或出错
+#endif
+}
+
 
 int GetSystemBits()
 {
-	if(sizeof(unsigned long) == 4)
-	{
-		return 32;
-	}
-	else if(sizeof(unsigned long) == 8)
-	{
+	// C/C++ 编译期常量（C++11 起）
+	if (sizeof(void*) == 8) {
+		// 64 位
 		return 64;
 	}
-	else
-	{
-		return -1; //unknown
+	else if (sizeof(void*) == 4) {
+		// 32 位
+		return 32;
 	}
 }
 
@@ -49,8 +66,8 @@ DWORD QueryRegistryValue(HKEY hMainKey, char * szSubKey, char * szKeyName, unsig
 	}
 
 	PVOID dwWow64Value;
-	int bits = GetSystemBits();
-	if (bits == 64 && hMainKey == HKEY_LOCAL_MACHINE)
+	int wow64 = IsRunningInWOW64();
+	if (wow64  && hMainKey == HKEY_LOCAL_MACHINE)
 	{
 		Wow64DisableWow64FsRedirection(&dwWow64Value);
 	}
@@ -58,7 +75,7 @@ DWORD QueryRegistryValue(HKEY hMainKey, char * szSubKey, char * szKeyName, unsig
 	//KEY_WEITE will cause error like winlogon
 	//winlogon :Registry symbolic links should only be used for for application compatibility when absolutely necessary.
 	iRes = RegCreateKeyExA(hMainKey, szSubKey, 0, REG_NONE, REG_OPTION_NON_VOLATILE, KEY_READ, 0, &hKey, &dwDisPos);
-	if (bits == 64 && hMainKey == HKEY_LOCAL_MACHINE)
+	if (wow64  && hMainKey == HKEY_LOCAL_MACHINE)
 	{
 		Wow64RevertWow64FsRedirection(&dwWow64Value);
 	}
@@ -70,6 +87,7 @@ DWORD QueryRegistryValue(HKEY hMainKey, char * szSubKey, char * szKeyName, unsig
 
 	//if value is 234 ,it means out buffer is limit.2 is not value
 	iRes = RegQueryValueExA(hKey, szKeyName, 0, &type, szKeyValue, &iQueryLen);
+	RegCloseKey(hKey);
 	if (iRes == ERROR_SUCCESS)
 	{
 		return TRUE;
@@ -84,7 +102,7 @@ DWORD QueryRegistryValue(HKEY hMainKey, char * szSubKey, char * szKeyName, unsig
 
 string StaticGateway::getAdapterAlias(string adaptername) {
 	unsigned char szalias[MAX_PATH] = { 0 };
-	//can not be \\SYSTEM?WHY?
+	//can not be \\SYSTEM
 	string subkey = "SYSTEM\\CurrentControlSet\\Control\\Network\\{4D36E972-E325-11CE-BFC1-08002BE10318}\\" + adaptername + "\\Connection\\";
 
 	int ret = QueryRegistryValue(HKEY_LOCAL_MACHINE, (char*)subkey.c_str(), "Name", szalias,REG_SZ);
